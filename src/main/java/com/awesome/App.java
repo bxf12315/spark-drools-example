@@ -1,20 +1,39 @@
 package com.awesome;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import org.apache.spark.api.java.*;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.broadcast.Broadcast;
+
+import org.kie.api.KieBase;
+import org.kie.api.KieServices;
+import org.kie.api.runtime.KieContainer;
 
 public class App {
   public static void main(String[] args) {
-    String logFile = "/opt/spark-1.4.1-bin-hadoop2.6/README.md"; // Should be some file on your system
+    List<Applicant> inputData = new ArrayList<Applicant>();
+    inputData.add(new Applicant(1, "John", "Doe", 10000, 568));
+
     SparkConf conf = new SparkConf().setAppName("Simple Application");
     JavaSparkContext sc = new JavaSparkContext(conf);
-    JavaRDD<String> logData = sc.textFile(logFile).cache();
 
-    long numAs = logData.filter( (String s) -> s.contains("a") ).count();
+    KieBase rules = loadRules();
+    Broadcast<KieBase> broadcastRules = sc.broadcast(rules);
 
-    long numBs = logData.filter( (String s) -> s.contains("b") ).count();
+    JavaRDD<Applicant> logData = sc.parallelize(inputData);
 
-    System.out.println("Lines with a: " + numAs + ", lines with b: " + numBs);
+    long numApproved = logData.filter( (Applicant a) -> a.isApproved() ).count();
+
+    System.out.println("Number of applicants approved: " + numApproved);
+  }
+
+  public static KieBase loadRules() {
+    KieServices kieServices = KieServices.Factory.get();
+    KieContainer kieContainer = kieServices.getKieClasspathContainer();
+
+    return kieContainer.getKieBase();
   }
 }
